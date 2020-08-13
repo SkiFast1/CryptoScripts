@@ -50,26 +50,19 @@ def get_entropy(numbytes):
         return dev_random_entropy(numbytes)
 
 def randint(min_value, max_value):
-    """ Chooses a random integer between min_value and max_value, inclusive.
-        Range of values: [min_value, max_value]
-    """
+
     if not (isinstance(min_value, int) and isinstance(min_value, int)):
         raise ValueError('min and max must be integers')
-    # Bounds are inclusive, so add 1 to the spread between the min and max
+
     value_range = (max_value - min_value) + 1
-    # The bytes of entropy required depends on the bit length of the value range
     numbytes_of_entropy = int(ceil(value_range.bit_length()/8.0)) + 1
-    # The entropy value range is the # of possible values of the entropy sample
     entropy_value_range = 2**(numbytes_of_entropy*8)
-    # Any number greater than a multiple of the value range will be rejected
     acceptable_sample_range = entropy_value_range - (entropy_value_range % value_range)
-    # Rejection sampling: Keep picking random #s until one falls in the range
     while True:
         byte_from_entropy = get_entropy(numbytes_of_entropy)
         int_from_entropy = int(byte_from_entropy.encode('hex'), 16)
         if int_from_entropy <= acceptable_sample_range:
             break
-    # Take the sampled int and extract an int that's within the provided bounds
     rand_int = min_value + (int_from_entropy % value_range)
     return rand_int
 
@@ -89,8 +82,6 @@ def mod_inverse(k, prime):
     return (prime + r) % prime
 
 def random_polynomial(degree, intercept, upper_bound):
-    """ Generates a random polynomial with positive coefficients.
-    """
     if degree < 0:
         raise ValueError('Degree must be a non-negative number.')
     coefficients = [intercept]
@@ -102,34 +93,24 @@ def random_polynomial(degree, intercept, upper_bound):
 def get_polynomial_points(coefficients, num_points, prime):
     points = []
     for x in range(1, num_points+1):
-        # start with x=1 and calculate the value of y
         y = coefficients[0]
-        # calculate each term and add it to y, using modular math
         for i in range(1, len(coefficients)):
             exponentiation = (long(x)**i) % prime
             term = (coefficients[i] * exponentiation) % prime
             y = (y + term) % prime
-        # add the point to the list of points
         points.append((x, y))
     return points
 
 def modular_lagrange_interpolation(x, points, prime):
-    # break the points up into lists of x and y values
     x_values, y_values = zip(*points)
-    # initialize f(x) and begin the calculation: f(x) = SUM( y_i * l_i(x) )
     f_x = long(0)
     for i in range(len(points)):
-        # evaluate the lagrange basis polynomial l_i(x)
         numerator, denominator = 1, 1
         for j in range(len(points)):
-            # don't compute a polynomial fraction if i equals j
             if i == j: continue
-            # compute a fraction and update the existing numerator + denominator
             numerator = (numerator * (x - x_values[j])) % prime
             denominator = (denominator * (x_values[i] - x_values[j])) % prime
-        # get the polynomial from the numerator + mod inverse of the denominator
         lagrange_polynomial = numerator * mod_inverse(denominator, prime)
-        # multiply the current y and the evaluated polynomial and add it to f(x)
         f_x = (prime + f_x + (y_values[i] * lagrange_polynomial)) % prime
     return f_x
 
@@ -144,57 +125,22 @@ def charset_to_int(s, charset):
     return output
 
 def change_charset(s, original_charset, target_charset):
-    """ Convert a string from one charset to another.
-    """
     intermediate_integer = charset_to_int(s, original_charset)
     output_string = int_to_charset(intermediate_integer, target_charset)
     return output_string
 
-""" Base16 includes numeric digits and the letters a through f. Here,
-    we use the lowecase letters.
-"""
 base16_chars = string.hexdigits[0:16]
 
-""" The Base58 character set allows for strings that avoid visual ambiguity
-    when typed. It consists of all the alphanumeric characters except for
-    "0", "O", "I", and "l", which look similar in some fonts.
-
-    https://en.bitcoin.it/wiki/Base58Check_encoding
-"""
 base58_chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-""" The Base32 character set allows for accurate transcribing by hand.
-    It consists of uppercase letters + numerals, excluding "0", "1", + "8",
-    which could look similar to "O", "I", and "B" and so are omitted.
-
-    http://en.wikipedia.org/wiki/Base32
-"""
 base32_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
-""" The z-base-32 character set is similar to the standard Base32 character
-    set, except it uses lowercase letters + numerals and chooses to exclude
-    "0", "l", "v", + "2". The set is also permuted so that easier chars
-    occur more frequently.
-
-    http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
-"""
 zbase32_chars = "ybndrfg8ejkmcpqxot1uwisza345h769"
 
-""" The Base64 character set is a popular encoding for transmitting data
-    over media that are designed for textual data. It includes all alphanumeric
-    characters plus two bonus characters, usually "+" and "/".
-
-    http://en.wikipedia.org/wiki/Base64
-"""
 base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 
 def secret_int_to_points(secret_int, point_threshold, num_points):
-    """ Split a secret (integer) into shares (pair of integers / x,y coords).
-
-        Sample the points of a random polynomial with the y intercept equal to
-        the secret int.
-    """
     if point_threshold < 2:
         raise ValueError("Threshold must be >= 2.")
     if point_threshold > num_points:
